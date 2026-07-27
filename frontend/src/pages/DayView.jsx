@@ -46,41 +46,67 @@ const DayView = () => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
+    // Save inputs
+    const title = newTaskTitle.trim();
+    const minutes = newTaskMinutes;
+    const priority = newTaskPriority;
+    const recurring = isRecurring;
+    const until = recurUntil;
+
+    if (recurring && !until) {
+      alert('Please select an end date for the recurring task.');
+      return;
+    }
+
+    // Instantly clear the form for a snappy UI
+    setNewTaskTitle('');
+    setNewTaskMinutes('');
+    setNewTaskPriority('normal');
+    setIsRecurring(false);
+    setRecurUntil('');
+
     try {
-      if (isRecurring) {
-        if (!recurUntil) {
-          alert('Please select an end date for the recurring task.');
-          return;
-        }
+      if (recurring) {
         await api.post('/series', {
-          title: newTaskTitle.trim(),
-          priority: newTaskPriority,
-          plannedMinutes: newTaskMinutes ? parseInt(newTaskMinutes, 10) : 0,
+          title,
+          priority,
+          plannedMinutes: minutes ? parseInt(minutes, 10) : 0,
           startDate: dateStr,
-          endDate: recurUntil
+          endDate: until
         });
         fetchTasks();
       } else {
-        const { data } = await api.post('/tasks', {
-          title: newTaskTitle.trim(),
+        // Optimistic UI for single tasks: add a fake temporary task
+        const tempId = Date.now().toString();
+        const fakeTask = {
+          _id: tempId,
+          title,
+          priority,
+          plannedMinutes: minutes ? parseInt(minutes, 10) : 0,
           dueDate: dateStr,
-          priority: newTaskPriority,
-          plannedMinutes: newTaskMinutes ? parseInt(newTaskMinutes, 10) : 0
+          completed: false,
+          rolloverCount: 0
+        };
+        setTasks(prev => [...prev, fakeTask]);
+
+        const { data } = await api.post('/tasks', {
+          title,
+          dueDate: dateStr,
+          priority,
+          plannedMinutes: minutes ? parseInt(minutes, 10) : 0
         });
-        setTasks([...tasks, data]);
+        
+        // Replace fake task with real task
+        setTasks(prev => prev.map(t => t._id === tempId ? data : t));
       }
-      
-      setNewTaskTitle('');
-      setNewTaskMinutes('');
-      setNewTaskPriority('normal');
-      setIsRecurring(false);
-      setRecurUntil('');
     } catch (err) {
       if (err.response?.data?.error) {
         alert(err.response.data.error);
       } else {
         console.error('Failed to create task', err);
       }
+      // Reload on failure to revert optimistic updates
+      fetchTasks();
     }
   };
 

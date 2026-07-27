@@ -10,11 +10,13 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
   const [editPriority, setEditPriority] = useState(task.priority);
 
   const toggleComplete = async () => {
+    const prevCompleted = task.completed;
+    onUpdate({ ...task, completed: !prevCompleted }); // Optimistic update
     try {
-      const res = await api.patch(`/tasks/${task._id}`, { completed: !task.completed });
-      onUpdate(res.data);
+      await api.patch(`/tasks/${task._id}`, { completed: !prevCompleted });
     } catch (err) {
       console.error(err);
+      onUpdate({ ...task, completed: prevCompleted }); // Revert on error
     }
   };
 
@@ -33,9 +35,9 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
   };
 
   const handleDelete = async () => {
+    onDelete(task._id); // Optimistic update
     try {
       await api.delete(`/tasks/${task._id}`);
-      onDelete(task._id);
     } catch (err) {
       console.error(err);
     }
