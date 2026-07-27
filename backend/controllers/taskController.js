@@ -1,5 +1,11 @@
 import { Task } from '../models/Task.js';
 import { z } from 'zod';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const createTaskSchema = z.object({
   title: z.string().min(1),
@@ -20,6 +26,23 @@ const updateTaskSchema = z.object({
 
 export const getTasks = async (req, res) => {
   try {
+    const todayStr = dayjs().tz(req.user.timezone || 'UTC').format('YYYY-MM-DD');
+    
+    // Always do a dynamic sweep of any past incomplete tasks before returning results
+    const overdueTasks = await Task.find({
+      userId: req.user._id,
+      completed: false,
+      dueDate: { $lt: todayStr }
+    });
+    
+    if (overdueTasks.length > 0) {
+      for (const task of overdueTasks) {
+        task.dueDate = todayStr;
+        task.rolloverCount += 1;
+        await task.save();
+      }
+    }
+
     const { date, month, start, end } = req.query;
     let query = { userId: req.user._id };
 
