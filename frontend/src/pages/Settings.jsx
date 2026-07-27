@@ -1,0 +1,142 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
+const Settings = () => {
+  const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
+  
+  const [dailyCapacityMinutes, setDailyCapacityMinutes] = useState('480');
+  const [dailyDigestEnabled, setDailyDigestEnabled] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  
+  const [themePreference, setThemePreference] = useState('dark');
+  
+  // Preview theme immediately when toggled
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themePreference);
+  }, [themePreference]);
+  
+  // Revert to saved preference if unmounted without saving
+  useEffect(() => {
+    return () => {
+      if (user?.themePreference) {
+        document.documentElement.setAttribute('data-theme', user.themePreference);
+      }
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      setDailyCapacityMinutes(user.dailyCapacityMinutes || '480');
+      setDailyDigestEnabled(user.dailyDigestEnabled || false);
+      setThemePreference(user.themePreference || 'dark');
+    }
+  }, [user]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setMessage('');
+    setError('');
+    
+    try {
+      await updateUser({
+        dailyCapacityMinutes,
+        dailyDigestEnabled,
+        themePreference
+      });
+      setMessage('Settings updated successfully');
+    } catch (err) {
+      setError('Failed to update settings');
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col w-full pb-10">
+      <div className="flex items-center mb-8">
+        <button onClick={() => navigate(-1)} className="mr-4 p-2 text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <h2 className="text-[32px] font-[800] tracking-tight text-[var(--text)]">Settings</h2>
+      </div>
+
+      <div className="max-w-2xl border-t border-[var(--border)] pt-8">
+        <form onSubmit={handleSave} className="space-y-8">
+          {error && <div className="text-[var(--high)] text-sm font-bold">{error}</div>}
+          {message && <div className="text-[var(--done)] text-sm font-bold">{message}</div>}
+
+          <div>
+            <label className="block text-sm font-bold text-[var(--text)] mb-2">Theme</label>
+            <div className="flex p-1 bg-[var(--field)] rounded-xl w-max border border-[var(--border)]">
+              <button
+                type="button"
+                onClick={async () => {
+                  setThemePreference('dark');
+                  try {
+                    await updateUser({ dailyCapacityMinutes, dailyDigestEnabled, themePreference: 'dark' });
+                  } catch (e) {}
+                }}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${themePreference === 'dark' ? 'bg-[var(--surface)] text-[var(--text)] border border-[var(--border)] shadow-sm' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}
+              >
+                Dark
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setThemePreference('light');
+                  try {
+                    await updateUser({ dailyCapacityMinutes, dailyDigestEnabled, themePreference: 'light' });
+                  } catch (e) {}
+                }}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${themePreference === 'light' ? 'bg-[var(--surface)] text-[var(--text)] border border-[var(--border)] shadow-sm' : 'text-[var(--text-dim)] hover:text-[var(--text)]'}`}
+              >
+                Light
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-[var(--text)] mb-2">Daily Capacity (minutes)</label>
+            <p className="text-xs text-[var(--text-dim)] mb-3">How many minutes of work you plan to do each day.</p>
+            <input 
+              type="number"
+              value={dailyCapacityMinutes}
+              onChange={e => setDailyCapacityMinutes(e.target.value)}
+              className="w-full max-w-[200px] bg-[var(--field)] text-[var(--text)] border border-[var(--border)] focus:border-[var(--border-strong)] rounded-xl p-3 placeholder-[var(--text-faint)] outline-none text-sm font-medium transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center space-x-3 cursor-pointer group">
+              <button
+                type="button"
+                onClick={() => setDailyDigestEnabled(!dailyDigestEnabled)}
+                className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border transition-colors ${
+                  dailyDigestEnabled ? 'bg-[var(--accent)] border-[var(--accent)]' : 'bg-[var(--field)] border-[var(--border)] group-hover:border-[var(--text-dim)]'
+                }`}
+              >
+                {dailyDigestEnabled && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FAF9F6" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                )}
+              </button>
+              <span className="text-sm font-bold text-[var(--text)]">Send me a morning summary</span>
+            </label>
+            <p className="text-xs text-[var(--text-dim)] mt-2 ml-8">Receive a daily email summarizing your planned tasks and carry-overs.</p>
+          </div>
+
+          <div className="pt-4 border-t border-[var(--border)]">
+            <button 
+              type="submit"
+              className="bg-[var(--accent)] text-[#FAF9F6] font-semibold py-3 px-6 rounded-xl transition-opacity mt-4 text-sm"
+            >
+              Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default Settings;

@@ -1,0 +1,13 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="28" fill="#1E1F24" />
+  
+  <circle cx="48" cy="28" r="8" fill="#FF6B47" />
+  <circle cx="72" cy="28" r="8" fill="#4A4B50" />
+  
+  <!-- Document outline -->
+  <path d="M 32 40 H 88 V 80 L 72 96 H 32 Z" fill="none" stroke="#38393F" stroke-width="8" stroke-linejoin="round" />
+  <path d="M 88 80 H 72 V 96" fill="none" stroke="#38393F" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" />
+  
+  <!-- Checkmark -->
+  <path d="M 40 64 L 56 80 L 80 48" fill="none" stroke="#FF6B47" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
