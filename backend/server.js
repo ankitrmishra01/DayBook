@@ -36,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/series', seriesRoutes);
+app.get('/api/health', (req, res) => res.status(200).json({ status: 'awake' }));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)
