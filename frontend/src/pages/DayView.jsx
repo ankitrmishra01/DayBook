@@ -30,14 +30,25 @@ const DayView = () => {
     fetchTasks();
   }, [dateStr]);
 
+  const [isWakingUp, setIsWakingUp] = useState(false);
+
   const fetchTasks = async () => {
     setLoading(true);
+    setIsWakingUp(false);
+    
+    // If it takes more than 3 seconds, the server is probably doing a cold start
+    const slowLoadTimer = setTimeout(() => {
+      setIsWakingUp(true);
+    }, 3000);
+
     try {
       const { data } = await api.get(`/tasks?date=${dateStr}`);
       setTasks(data);
     } catch (err) {
       console.error('Failed to fetch tasks', err);
+      alert('The server took too long to respond. Please refresh the page in a few seconds once it wakes up!');
     } finally {
+      clearTimeout(slowLoadTimer);
       setLoading(false);
     }
   };
@@ -174,7 +185,14 @@ const DayView = () => {
 
       <div className="flex-1 flex flex-col mb-12">
         {loading ? (
-          <div className="text-[var(--text-dim)] font-medium py-10">Loading tasks...</div>
+          <div className="py-10 flex flex-col space-y-2">
+            <div className="text-[var(--text-dim)] font-medium">Loading tasks...</div>
+            {isWakingUp && (
+              <div className="text-[13px] text-[var(--text-faint)]">
+                Server is waking up from sleep mode (this takes ~45s on the free tier). Please hang tight!
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col">
             
