@@ -28,7 +28,7 @@ const DayView = () => {
       return;
     }
     fetchTasks();
-  }, [dateStr]);
+  }, [date, dateStr]);
 
   const [isWakingUp, setIsWakingUp] = useState(false);
 
