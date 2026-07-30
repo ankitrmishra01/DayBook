@@ -170,7 +170,7 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
         </button>
 
         <div className="flex-1 min-w-0 flex items-center flex-wrap gap-2">
-          <h3 className={`text-[14px] font-medium truncate transition-colors ${task.completed ? 'line-through text-[var(--text-faint)]' : 'text-[var(--text)]'}`}>
+          <h3 className={`text-[14px] font-medium truncate transition-all ${task.completed === true ? 'line-through opacity-50 text-[var(--text-faint)]' : 'text-[var(--text)]'}`}>
             {task.title}
           </h3>
           
