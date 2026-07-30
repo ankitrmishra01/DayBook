@@ -191,15 +191,7 @@ const DayView = () => {
   const totalCount = tasks.length;
   const progressPct = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
-  const formatHours = (mins) => {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
-  };
 
-  const plannedDisplay = formatHours(totalPlanned) || '0m';
 
   return (
     <div className="flex-1 flex flex-col w-full pb-24">
