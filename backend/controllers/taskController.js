@@ -21,7 +21,8 @@ const updateTaskSchema = z.object({
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   priority: z.enum(['high', 'normal', 'low']).optional(),
   completed: z.boolean().optional(),
-  plannedMinutes: z.number().nonnegative().optional()
+  plannedMinutes: z.number().nonnegative().optional(),
+  rolloverCount: z.number().nonnegative().optional()
 });
 
 export const getTasks = async (req, res) => {
@@ -143,6 +144,7 @@ export const updateTask = async (req, res) => {
     if (validatedData.dueDate) task.dueDate = validatedData.dueDate;
     if (validatedData.priority) task.priority = validatedData.priority;
     if (validatedData.plannedMinutes !== undefined) task.plannedMinutes = validatedData.plannedMinutes;
+    if (validatedData.rolloverCount !== undefined) task.rolloverCount = validatedData.rolloverCount;
 
     await task.save();
     res.json(task);
@@ -162,6 +164,34 @@ export const deleteTask = async (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
     res.json({ message: 'Task removed' });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const searchTasks = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.status(400).json({ error: 'Search query is required' });
+
+    const tasks = await Task.find({
+      userId: req.user._id,
+      $or: [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } }
+      ]
+    }).sort({ dueDate: -1 }).limit(50);
+
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+export const exportTasks = async (req, res) => {
+  try {
+    const tasks = await Task.find({ userId: req.user._id }).sort({ dueDate: 1 });
+    res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }

@@ -8,6 +8,8 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
   const [editTitle, setEditTitle] = useState(task.title);
   const [editMinutes, setEditMinutes] = useState(task.plannedMinutes || '');
   const [editPriority, setEditPriority] = useState(task.priority);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [customRescheduleDate, setCustomRescheduleDate] = useState('');
 
   const toggleComplete = async () => {
     const prevCompleted = task.completed;
@@ -34,13 +36,8 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
     }
   };
 
-  const handleDelete = async () => {
-    onDelete(task._id); // Optimistic update
-    try {
-      await api.delete(`/tasks/${task._id}`);
-    } catch (err) {
-      console.error(err);
-    }
+  const handleDelete = () => {
+    onDelete(task._id);
   };
 
   const handleReschedule = async (days) => {
@@ -48,6 +45,20 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
       const newDate = dayjs(task.dueDate).add(days, 'day').format('YYYY-MM-DD');
       const res = await api.patch(`/tasks/${task._id}`, { dueDate: newDate, rolloverCount: 0 }); 
       onUpdate(res.data);
+      setIsRescheduling(false);
+      setExpanded(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCustomReschedule = async () => {
+    if (!customRescheduleDate) return;
+    try {
+      const res = await api.patch(`/tasks/${task._id}`, { dueDate: customRescheduleDate, rolloverCount: 0 });
+      onUpdate(res.data);
+      setIsRescheduling(false);
+      setExpanded(false);
     } catch (err) {
       console.error(err);
     }
@@ -61,6 +72,12 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
 
   const isRolledOver = task.rolloverCount > 0;
   const needsNudge = task.rolloverCount >= 3;
+
+  const formatBadgeTime = (mins) => {
+    if (mins >= 60 && mins % 60 === 0) return `${mins/60}H`;
+    if (mins > 60) return `${Math.floor(mins/60)}H ${mins%60}M`;
+    return `${mins}M`;
+  };
 
   if (isEditing) {
     return (
@@ -98,6 +115,41 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
             <button onClick={() => setIsEditing(false)} className="text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">Cancel</button>
             <button onClick={handleSaveEdit} className="bg-[var(--accent)] text-[#FAF9F6] text-[12px] font-bold px-3 py-1 rounded transition-opacity hover:opacity-90">Save</button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isRescheduling) {
+    return (
+      <div className="border-b border-[var(--border)] last:border-b-0 py-3.5 px-3 bg-[var(--field)] transition-colors">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center space-x-3">
+            <button 
+              onClick={() => handleReschedule(1)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-md bg-[var(--surface)] text-[var(--text)] hover:text-[var(--accent)] transition-colors border border-[var(--border)] shadow-sm"
+            >
+              Move to tomorrow
+            </button>
+            <span className="text-[12px] font-medium text-[var(--text-faint)]">or pick date:</span>
+            <input 
+              type="date"
+              value={customRescheduleDate}
+              onChange={(e) => setCustomRescheduleDate(e.target.value)}
+              className="bg-transparent border border-[var(--border)] font-medium text-[var(--text)] text-[12px] rounded-md px-2 py-1 outline-none focus:border-[var(--border-strong)]"
+            />
+            {customRescheduleDate && (
+              <button 
+                onClick={handleCustomReschedule}
+                className="bg-[var(--accent)] text-[#FAF9F6] text-[12px] font-bold px-3 py-1 rounded transition-opacity hover:opacity-90"
+              >
+                Move
+              </button>
+            )}
+          </div>
+          <button onClick={() => setIsRescheduling(false)} className="text-[12px] font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">
+            Cancel
+          </button>
         </div>
       </div>
     );
@@ -141,17 +193,29 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
                   {needsNudge ? `Rolled ${task.rolloverCount}× · Act now` : `Rolled ${task.rolloverCount}×`}
                 </span>
               )}
+
+              {task.plannedMinutes > 0 && (
+                <span 
+                  className="text-[11px] font-bold px-2 py-0.5 rounded-[4px] uppercase tracking-wide"
+                  style={{ backgroundColor: 'rgba(154,155,163,0.14)', color: 'var(--normal)' }}
+                >
+                  {formatBadgeTime(task.plannedMinutes)}
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {task.plannedMinutes > 0 && (
-          <div className="ml-3 flex-shrink-0 text-[13px] font-medium text-[var(--text-faint)] tabular-nums">
-            {task.plannedMinutes}m
-          </div>
-        )}
+
         
         <div className="opacity-30 group-hover:opacity-100 flex items-center space-x-1 ml-4 transition-all focus-within:opacity-100">
+          <button 
+            onClick={() => setIsRescheduling(true)}
+            className="p-1.5 flex-shrink-0 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] rounded transition-colors"
+            title="Reschedule Task"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+          </button>
           <button 
             onClick={() => setIsEditing(true)}
             className="p-1.5 flex-shrink-0 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)] rounded transition-colors"

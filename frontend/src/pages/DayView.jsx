@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import api from '../api/api';
@@ -129,22 +129,67 @@ const DayView = () => {
     }
   };
 
-  const handleTaskDelete = (id) => {
-    setTasks(tasks.filter(t => t._id !== id));
+  const pendingDeleteRef = useRef(null);
+  const [toast, setToast] = useState(null);
+
+  const commitDelete = (taskId) => {
+    if (!taskId) return;
+    api.delete(`/tasks/${taskId}`).catch(console.error);
+    if (pendingDeleteRef.current?._id === taskId) {
+      pendingDeleteRef.current = null;
+      setToast(null);
+    }
   };
 
-  // Stats calculation
-  const incompleteTasks = tasks.filter(t => !t.completed);
-  const totalPlanned = incompleteTasks.reduce((sum, t) => sum + (t.plannedMinutes || 0), 0);
-  const hasPlannedMinutes = incompleteTasks.some(t => t.plannedMinutes && t.plannedMinutes > 0);
-  const rolledOverCount = incompleteTasks.filter(t => t.rolloverCount > 0).length;
-  const capacity = user?.dailyCapacityMinutes ? parseInt(user.dailyCapacityMinutes, 10) : 480;
-  const capacityPct = Math.min(100, Math.max(0, (totalPlanned / capacity) * 100));
-  
-  // Circle math for radial dial
-  const radius = 24;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (capacityPct / 100) * circumference;
+  const handleTaskDelete = (id) => {
+    const taskToDelete = tasks.find(t => t._id === id);
+    if (!taskToDelete) return;
+
+    // Optimistically remove from UI
+    setTasks(prev => prev.filter(t => t._id !== id));
+
+    // Commit previous delete if one exists
+    if (pendingDeleteRef.current) {
+      commitDelete(pendingDeleteRef.current._id);
+    }
+
+    pendingDeleteRef.current = taskToDelete;
+    setToast(taskToDelete);
+
+    // Auto commit after 5s
+    setTimeout(() => {
+      if (pendingDeleteRef.current?._id === id) {
+        commitDelete(id);
+      }
+    }, 5000);
+  };
+
+  const handleUndo = () => {
+    if (pendingDeleteRef.current) {
+      const restored = pendingDeleteRef.current;
+      setTasks(prev => {
+        const newTasks = [...prev, restored];
+        return newTasks.sort((a, b) => {
+          if (a.createdAt && b.createdAt) return a.createdAt > b.createdAt ? 1 : -1;
+          return 0;
+        });
+      });
+      pendingDeleteRef.current = null;
+      setToast(null);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteRef.current) {
+        api.delete(`/tasks/${pendingDeleteRef.current._id}`).catch(() => {});
+      }
+    };
+  }, []);
+
+  const completedCount = tasks.filter(t => t.completed).length;
+  const totalCount = tasks.length;
+  const progressPct = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   const formatHours = (mins) => {
     const h = Math.floor(mins / 60);
@@ -169,17 +214,25 @@ const DayView = () => {
         </h2>
         
         {/* Simple Inline Stat */}
-        <div className="flex flex-col space-y-3">
-          <div className="text-[13px] font-medium text-[var(--text-dim)]">
-            Today's load — <span className="text-[var(--text)] font-semibold">{plannedDisplay}</span> of {formatHours(capacity)} planned
-          </div>
-          {/* 2px progress line */}
-          <div className="h-[2px] w-full max-w-sm bg-[var(--field)] rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-[var(--accent)] rounded-full transition-all duration-700 ease-out" 
-              style={{ width: `${capacityPct}%` }}
-            />
-          </div>
+        <div className="flex items-center space-x-3">
+          {totalCount > 0 && completedCount === totalCount ? (
+            <div className="flex items-center space-x-1.5 text-[var(--done)] bg-[rgba(154,155,163,0.14)] px-2.5 py-1 rounded-[6px]">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span className="text-[12px] font-bold tracking-wide">All done</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <div className="text-[11px] font-bold px-2 py-0.5 rounded-[4px] tracking-wide" style={{ backgroundColor: 'rgba(154,155,163,0.14)', color: 'var(--text)' }}>
+                {completedCount}/{totalCount}
+              </div>
+              <div className="h-[4px] w-[70px] bg-[rgba(154,155,163,0.14)] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-[var(--done)] rounded-full transition-all duration-700 ease-out" 
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -279,25 +332,37 @@ const DayView = () => {
       </div>
       
       {/* Date navigation */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-[var(--surface)] p-1.5 rounded-full border border-[var(--border)] z-50">
-        <button 
-          onClick={() => navigate(`/day/${selectedDate.subtract(1, 'day').format('YYYY-MM-DD')}`)}
-          className="p-2 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--field)] rounded-full transition-colors"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-        <button 
-          onClick={() => navigate(`/day/${dayjs().format('YYYY-MM-DD')}`)}
-          className="px-5 py-2 text-[13px] font-bold text-[var(--text)] hover:bg-[var(--field)] rounded-full transition-colors"
-        >
-          Today
-        </button>
-        <button 
-          onClick={() => navigate(`/day/${selectedDate.add(1, 'day').format('YYYY-MM-DD')}`)}
-          className="p-2 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--field)] rounded-full transition-colors"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center z-50 pointer-events-none">
+        
+        {toast && (
+          <div className="pointer-events-auto mb-4 flex items-center justify-between bg-[var(--surface-3)] border border-[var(--border)] shadow-lg px-4 py-2.5 rounded-xl w-64 animate-in slide-in-from-bottom-2 fade-in duration-300">
+            <span className="text-[13px] font-medium text-[var(--text)] truncate mr-3">Task deleted</span>
+            <button onClick={handleUndo} className="text-[13px] font-bold text-[var(--accent)] hover:opacity-80 transition-opacity">
+              Undo
+            </button>
+          </div>
+        )}
+
+        <div className="pointer-events-auto flex items-center space-x-2 bg-[var(--surface)] p-1.5 rounded-full border border-[var(--border)]">
+          <button 
+            onClick={() => navigate(`/day/${selectedDate.subtract(1, 'day').format('YYYY-MM-DD')}`)}
+            className="p-2 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--field)] rounded-full transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button 
+            onClick={() => navigate(`/day/${dayjs().format('YYYY-MM-DD')}`)}
+            className="px-5 py-2 text-[13px] font-bold text-[var(--text)] hover:bg-[var(--field)] rounded-full transition-colors"
+          >
+            Today
+          </button>
+          <button 
+            onClick={() => navigate(`/day/${selectedDate.add(1, 'day').format('YYYY-MM-DD')}`)}
+            className="p-2 text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--field)] rounded-full transition-colors"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   );

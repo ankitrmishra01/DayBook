@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/api';
 
 const Settings = () => {
   const { user, updateUser } = useAuth();
@@ -49,6 +50,24 @@ const Settings = () => {
       setMessage('Settings updated successfully');
     } catch (err) {
       setError('Failed to update settings');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const { data } = await api.get('/tasks/export');
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `daybook-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to export tasks');
     }
   };
 
@@ -134,6 +153,19 @@ const Settings = () => {
             </button>
           </div>
         </form>
+
+        <div className="pt-8 border-t border-[var(--border)] mt-8">
+          <h3 className="text-sm font-bold text-[var(--text)] mb-2">Data Export</h3>
+          <p className="text-xs text-[var(--text-dim)] mb-4">Download a complete backup of all your tasks in JSON format.</p>
+          <button 
+            type="button"
+            onClick={handleExport}
+            className="bg-[var(--field)] text-[var(--text)] font-semibold py-2 px-4 rounded-xl border border-[var(--border)] hover:border-[var(--text-dim)] transition-colors text-sm flex items-center w-max"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Export Data
+          </button>
+        </div>
       </div>
     </div>
   );
