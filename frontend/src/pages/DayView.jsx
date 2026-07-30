@@ -4,7 +4,6 @@ import dayjs from 'dayjs';
 import api from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import TaskRow from '../components/TaskRow';
-import DayViewSidebar from '../components/DayViewSidebar';
 
 const DayView = () => {
   const { date } = useParams();
@@ -195,7 +194,7 @@ const DayView = () => {
 
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-8 w-full pb-24 items-start">
+    <div className="flex-1 flex flex-col w-full max-w-[600px] pb-24 items-start">
       <div className="flex flex-col w-full min-w-0 pb-24">
       {/* Hero Header */}
       <div className="mb-10 mt-6">
@@ -357,8 +356,6 @@ const DayView = () => {
           </button>
         </div>
       </div>
-      
-      <DayViewSidebar />
     </div>
   );
 };
