@@ -165,8 +165,8 @@ const Layout = () => {
     }`;
 
   return (
-    <div className="min-h-screen text-[var(--text)] flex flex-col">
-      <header className="h-20 flex items-center justify-between gap-4 px-6 max-w-[760px] w-full mx-auto">
+    <div className="min-h-screen text-[var(--text)] flex flex-col overflow-x-hidden w-full">
+      <header className="h-20 flex items-center justify-between gap-4 px-6 max-w-5xl w-full mx-auto">
         
         {/* Left Group: Logo + Nav */}
         <div className="flex items-center gap-6 sm:gap-7 shrink-0">
@@ -215,7 +215,7 @@ const Layout = () => {
         <NavLink to="/year" className={navClass}>Year</NavLink>
       </div>
 
-      <main className="flex-1 flex flex-col max-w-[760px] w-full mx-auto px-6 pt-4 pb-12 overflow-hidden">
+      <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-6 pt-4 pb-12 overflow-x-hidden">
         <Outlet />
       </main>
     </div>
