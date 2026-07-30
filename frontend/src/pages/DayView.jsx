@@ -194,10 +194,10 @@ const DayView = () => {
 
 
   return (
-    <div className="flex-1 flex flex-col w-full pb-24">
+    <div className="flex-1 flex flex-col w-full pb-24 max-w-2xl mx-auto">
       
       {/* Hero Header */}
-      <div className="mb-12 mt-6">
+      <div className="mb-10 mt-6">
         <div className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">
           {selectedDate.format('dddd')}
         </div>
@@ -205,19 +205,19 @@ const DayView = () => {
           {selectedDate.format('D MMMM')}
         </h2>
         
-        {/* Simple Inline Stat */}
-        <div className="flex items-center space-x-3">
+        {/* Progress Card */}
+        <div className="inline-flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 shadow-sm">
           {totalCount > 0 && completedCount === totalCount ? (
-            <div className="flex items-center space-x-1.5 text-[var(--done)] bg-[rgba(154,155,163,0.14)] px-2.5 py-1 rounded-[6px]">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span className="text-[12px] font-bold tracking-wide">All done</span>
+            <div className="flex items-center space-x-2 text-[var(--done)]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span className="text-[13px] font-bold tracking-wide">All done</span>
             </div>
           ) : (
             <div className="flex items-center space-x-3">
-              <div className="text-[11px] font-bold px-2 py-0.5 rounded-[4px] tracking-wide" style={{ backgroundColor: 'rgba(154,155,163,0.14)', color: 'var(--text)' }}>
+              <div className="text-[11px] font-bold px-2 py-0.5 rounded-[6px] tracking-wide bg-[var(--field)] text-[var(--text)] border border-[var(--border-strong)]">
                 {completedCount}/{totalCount}
               </div>
-              <div className="h-[4px] w-[70px] bg-[rgba(154,155,163,0.14)] rounded-full overflow-hidden">
+              <div className="h-[5px] w-[80px] bg-[var(--field)] rounded-full overflow-hidden border border-[var(--border-strong)]">
                 <div 
                   className="h-full bg-[var(--done)] rounded-full transition-all duration-700 ease-out" 
                   style={{ width: `${progressPct}%` }}

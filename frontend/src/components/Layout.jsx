@@ -166,7 +166,7 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen text-[var(--text)] flex flex-col">
-      <header className="h-20 flex items-center justify-between gap-4 px-5 sm:px-6 max-w-7xl w-full mx-auto">
+      <header className="h-20 flex items-center justify-between gap-4 px-5 sm:px-6 max-w-5xl w-full mx-auto">
         
         {/* Left Group: Logo + Nav */}
         <div className="flex items-center gap-6 sm:gap-7 shrink-0">
