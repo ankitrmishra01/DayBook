@@ -93,7 +93,7 @@ const YearView = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col w-full pb-10 relative">
+    <div className="flex-1 flex flex-col w-full max-w-[900px] mx-auto pb-10 relative">
       <div className="flex items-center justify-between mb-8 mt-6">
         <h2 className="text-[32px] font-[700] tracking-tight leading-none text-[var(--text)]">
           {currentYear}

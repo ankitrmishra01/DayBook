@@ -58,7 +58,7 @@ const MonthView = () => {
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="flex-1 flex flex-col w-full pb-10">
+    <div className="flex-1 flex flex-col w-full max-w-[900px] mx-auto pb-10">
       
       <div className="flex items-center justify-between mb-8 mt-6">
         <h2 className="text-[32px] font-[700] tracking-tight leading-none text-[var(--text)]">
