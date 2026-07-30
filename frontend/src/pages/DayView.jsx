@@ -357,6 +357,7 @@ const DayView = () => {
         </div>
       </div>
     </div>
+    </div>
   );
 };
 
