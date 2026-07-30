@@ -194,7 +194,7 @@ const DayView = () => {
 
 
   return (
-    <div className="flex-1 flex flex-col w-full pb-24 max-w-2xl mx-auto">
+    <div className="flex-1 flex flex-col w-full pb-24">
       
       {/* Hero Header */}
       <div className="mb-10 mt-6">
