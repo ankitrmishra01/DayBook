@@ -361,22 +361,28 @@ const DayView = () => {
         </form>
 
         {/* Progress Card */}
-        <div className="inline-flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-[14px] px-5 py-3.5 shadow-sm">
+        <div className="w-full flex flex-col sm:flex-row sm:items-center bg-[var(--surface)] border border-[var(--border)] rounded-[14px] p-4 sm:px-5 sm:py-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500 mb-2">
           {totalCount > 0 && completedCount === totalCount ? (
-            <div className="flex items-center space-x-2.5 text-[var(--done)]">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span className="text-[15px] font-bold tracking-wide">All done</span>
+            <div className="flex items-center justify-center w-full space-x-3 text-[var(--done)] animate-pulse">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span className="text-[16px] font-extrabold tracking-wide">All tasks completed! Great job!</span>
             </div>
           ) : (
-            <div className="flex items-center space-x-4">
-              <div className="text-[13px] font-bold px-2.5 py-1 rounded-[8px] tracking-wide bg-[var(--field)] text-[var(--text)] border border-[var(--border-strong)]">
-                {completedCount}/{totalCount}
+            <div className="flex flex-col sm:flex-row sm:items-center w-full gap-3 sm:gap-5">
+              <div className="flex items-center justify-between sm:justify-start gap-3 min-w-[80px]">
+                <span className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-wider hidden sm:block">Progress</span>
+                <div className="text-[14px] font-bold px-3 py-1 rounded-[8px] tracking-wide bg-[var(--field)] text-[var(--text)] border border-[var(--border-strong)] shadow-sm">
+                  {completedCount} / {totalCount}
+                </div>
               </div>
-              <div className="h-[8px] w-[140px] sm:w-[180px] bg-[var(--field)] rounded-full overflow-hidden border border-[var(--border-strong)]">
+              <div className="flex-1 h-[10px] w-full bg-[var(--field)] rounded-full overflow-hidden border border-[var(--border-strong)] relative">
                 <div 
-                  className="h-full bg-[var(--done)] rounded-full transition-all duration-700 ease-out" 
+                  className="absolute top-0 left-0 h-full bg-[var(--done)] rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_var(--done)] opacity-80" 
                   style={{ width: `${progressPct}%` }}
                 />
+              </div>
+              <div className="text-[13px] font-extrabold text-[var(--done)] sm:w-[40px] text-right">
+                {progressPct}%
               </div>
             </div>
           )}
