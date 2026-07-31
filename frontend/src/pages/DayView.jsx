@@ -18,6 +18,8 @@ const DayView = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all | high | rolled
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskMinutes, setNewTaskMinutes] = useState('');
@@ -216,6 +218,9 @@ const DayView = () => {
     return true;
   });
 
+  const totalPages = Math.ceil(filteredTasks.length / pageSize);
+  const paginatedTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   useEffect(() => {
     const handleTaskCreated = () => {
       if (dateStr === dayjs().format('YYYY-MM-DD')) {
@@ -272,7 +277,8 @@ const DayView = () => {
           {selectedDate.format('D MMMM')}
         </h2>
         
-        {/* Quick Filters */}
+
+
         <div className="flex items-center gap-2 mb-6 mt-4">
           <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-colors ${filter === 'all' ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--field)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
             All
@@ -285,6 +291,75 @@ const DayView = () => {
           </button>
         </div>
         
+        {/* Quick Add Form (Moved to Top) */}
+        <form onSubmit={handleCreateTask} className="mb-6 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full bg-[var(--field)] p-2 sm:p-1.5 sm:pl-3 rounded-xl border border-[var(--border)] focus-within:border-[var(--border-strong)] transition-colors">
+            
+            <input 
+              type="text"
+              placeholder="What needs to be done?"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              className="w-full sm:flex-1 bg-transparent font-medium text-[var(--text)] text-[14px] outline-none placeholder:text-[var(--text-faint)] px-2 sm:px-0 py-1 sm:py-0"
+            />
+            
+            <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-[var(--border)] pt-2 sm:pt-0">
+              <select 
+                value={newTaskPriority}
+                onChange={(e) => setNewTaskPriority(e.target.value)}
+                className="bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none cursor-pointer"
+              >
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+              
+              <div className="flex items-center gap-2">
+                <input 
+                  type="number"
+                  placeholder="mins"
+                  value={newTaskMinutes}
+                  onChange={(e) => setNewTaskMinutes(e.target.value)}
+                  className="w-16 bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none text-right placeholder:text-[var(--text-faint)] tabular-nums"
+                  min="0"
+                  step="5"
+                />
+
+                <button 
+                  type="button"
+                  onClick={() => setIsRecurring(!isRecurring)}
+                  className={`p-1.5 rounded transition-colors ${isRecurring ? 'text-[var(--accent)] bg-[var(--surface)] shadow-sm' : 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}
+                  title="Repeat daily"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                </button>
+                
+                <button 
+                  type="submit"
+                  className="bg-[var(--text)] text-[var(--bg)] text-[13px] font-bold px-4 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Recurring Options Expansion */}
+          {isRecurring && (
+            <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center space-x-3 pl-11">
+              <span className="text-[13px] font-medium text-[var(--text-dim)]">Repeat daily until</span>
+              <input 
+                type="date"
+                value={recurUntil}
+                onChange={(e) => setRecurUntil(e.target.value)}
+                min={dateStr}
+                className="bg-[var(--field)] border border-[var(--border)] font-medium text-[var(--text)] text-[13px] rounded-lg px-3 py-1.5 outline-none focus:border-[var(--border-strong)]"
+                required
+              />
+            </div>
+          )}
+        </form>
+
         {/* Progress Card */}
         <div className="inline-flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-[14px] px-5 py-3.5 shadow-sm">
           {totalCount > 0 && completedCount === totalCount ? (
@@ -335,7 +410,7 @@ const DayView = () => {
                 </div>
               ) : (
                 <div className="flex flex-col divide-y divide-[var(--border)] border-t border-[var(--border)]">
-                {filteredTasks.map((task, index) => (
+                {paginatedTasks.map((task, index) => (
                   <TaskRow 
                     key={task._id} 
                     task={task} 
@@ -348,74 +423,29 @@ const DayView = () => {
               )}
             </div>
             
-            {/* Quick Add Form */}
-            <form onSubmit={handleCreateTask} className="mt-0 border-t border-[var(--border)] pt-4 pb-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full bg-[var(--field)] p-2 sm:p-1.5 sm:pl-3 rounded-xl border border-[var(--border)] focus-within:border-[var(--border-strong)] transition-colors">
-                
-                <input 
-                  type="text"
-                  placeholder="What needs to be done?"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full sm:flex-1 bg-transparent font-medium text-[var(--text)] text-[14px] outline-none placeholder:text-[var(--text-faint)] px-2 sm:px-0 py-1 sm:py-0"
-                />
-                
-                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-[var(--border)] pt-2 sm:pt-0">
-                  <select 
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value)}
-                    className="bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none cursor-pointer"
-                  >
-                    <option value="high">High</option>
-                    <option value="normal">Normal</option>
-                    <option value="low">Low</option>
-                  </select>
-                  
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="number"
-                      placeholder="mins"
-                      value={newTaskMinutes}
-                      onChange={(e) => setNewTaskMinutes(e.target.value)}
-                      className="w-16 bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none text-right placeholder:text-[var(--text-faint)] tabular-nums"
-                      min="0"
-                      step="5"
-                    />
-
-                    <button 
-                      type="button"
-                      onClick={() => setIsRecurring(!isRecurring)}
-                      className={`p-1.5 rounded transition-colors ${isRecurring ? 'text-[var(--accent)] bg-[var(--surface)] shadow-sm' : 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}
-                      title="Repeat daily"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-                    </button>
-                    
-                    <button 
-                      type="submit"
-                      className="bg-[var(--text)] text-[var(--bg)] text-[13px] font-bold px-4 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                    >
-                      Add
-                    </button>
-                  </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-between items-center py-4 border-t border-[var(--border)] mt-4">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg bg-[var(--field)] text-[13px] font-bold text-[var(--text-dim)] disabled:opacity-50 hover:text-[var(--text)] transition-colors"
+                >
+                  Previous
+                </button>
+                <div className="text-[13px] font-bold text-[var(--text-faint)]">
+                  Page {currentPage} of {totalPages}
                 </div>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg bg-[var(--field)] text-[13px] font-bold text-[var(--text-dim)] disabled:opacity-50 hover:text-[var(--text)] transition-colors"
+                >
+                  Next
+                </button>
               </div>
+            )}
 
-              {/* Recurring Options Expansion */}
-              {isRecurring && (
-                <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center space-x-3 pl-11">
-                  <span className="text-[13px] font-medium text-[var(--text-dim)]">Repeat daily until</span>
-                  <input 
-                    type="date"
-                    value={recurUntil}
-                    onChange={(e) => setRecurUntil(e.target.value)}
-                    min={dateStr}
-                    className="bg-[var(--field)] border border-[var(--border)] font-medium text-[var(--text)] text-[13px] rounded-lg px-3 py-1.5 outline-none focus:border-[var(--border-strong)]"
-                    required
-                  />
-                </div>
-              )}
-            </form>
           </div>
         )}
       </div>

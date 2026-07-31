@@ -103,7 +103,7 @@ const Layout = () => {
         <MiniCalendar activeDateStr={date || today} />
 
         {/* This week stats */}
-        <div className="bg-[var(--bg)] border border-[var(--border)] rounded-[12px] p-4 shadow-sm mb-auto">
+        <div className="bg-[var(--bg)] border border-[var(--border)] rounded-[12px] p-4 shadow-sm mt-auto mb-4">
           <h3 className="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-3">This Week</h3>
           <div className="flex items-end justify-between mb-2">
             <div className="text-2xl font-extrabold text-[var(--text)] tracking-tight">

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
+import api from '../api/api';
 
 const MiniCalendar = ({ activeDateStr }) => {
   const navigate = useNavigate();
@@ -13,6 +14,25 @@ const MiniCalendar = ({ activeDateStr }) => {
   const handleNextMonth = () => setCurrentMonth(prev => prev.add(1, 'month'));
 
   const today = dayjs().format('YYYY-MM-DD');
+  
+  const [taskDates, setTaskDates] = useState(new Set());
+
+  useEffect(() => {
+    const fetchMonthTasks = async () => {
+      try {
+        const start = currentMonth.startOf('month').startOf('week').format('YYYY-MM-DD');
+        const end = currentMonth.endOf('month').endOf('week').format('YYYY-MM-DD');
+        const { data } = await api.get(`/tasks?start=${start}&end=${end}`);
+        
+        // Collect dates that have tasks
+        const dates = new Set(data.map(t => t.date));
+        setTaskDates(dates);
+      } catch (err) {
+        console.error('Failed to fetch mini calendar tasks:', err);
+      }
+    };
+    fetchMonthTasks();
+  }, [currentMonth]);
 
   // Generate days for the grid
   const startDay = currentMonth.startOf('month').day();
@@ -94,9 +114,12 @@ const MiniCalendar = ({ activeDateStr }) => {
             <button 
               key={i} 
               onClick={() => navigate(`/day/${d.date}`)}
-              className={btnClass}
+              className={btnClass + " relative flex flex-col"}
             >
-              {dayjs(d.date).date()}
+              <span>{dayjs(d.date).date()}</span>
+              {taskDates.has(d.date) && (
+                <div className={`absolute bottom-0.5 w-1 h-1 rounded-full ${isActive ? 'bg-[var(--bg)]' : isToday ? 'bg-[var(--accent)]' : 'bg-[var(--done)]'}`} />
+              )}
             </button>
           );
         })}
