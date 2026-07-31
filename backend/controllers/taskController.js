@@ -120,6 +120,24 @@ export const createTask = async (req, res) => {
   }
 };
 
+export const restoreTask = async (req, res) => {
+  try {
+    const taskData = req.body;
+    // Strip original _id to allow mongoose to create a new one, or we could keep it if we want to retain the same ID.
+    // However, if it was actually hard deleted, we can just let it have a new ID or use the old one.
+    // Wait, since it's a soft delete, using the old ID is completely fine if it's not present.
+    // But Mongoose `create` handles `_id` automatically if passed in. Let's just create.
+    const task = await Task.create({
+      ...taskData,
+      userId: req.user._id
+    });
+    res.status(201).json(task);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error during restore' });
+  }
+};
+
 export const updateTask = async (req, res) => {
   try {
     const { id } = req.params;

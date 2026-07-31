@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import api from '../api/api';
 import { useAuth } from '../contexts/AuthContext';
 import TaskRow from '../components/TaskRow';
+import UpcomingPanel from '../components/UpcomingPanel';
 
 const DayView = () => {
   const { date } = useParams();
@@ -15,6 +16,8 @@ const DayView = () => {
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all | high | rolled
+  const [activeIndex, setActiveIndex] = useState(-1);
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskMinutes, setNewTaskMinutes] = useState('');
@@ -27,12 +30,12 @@ const DayView = () => {
       navigate(`/day/${dayjs().format('YYYY-MM-DD')}`, { replace: true });
       return;
     }
-    fetchTasks();
-  }, [date, dateStr]);
+    fetchTasks(date);
+  }, [date]);
 
   const [isWakingUp, setIsWakingUp] = useState(false);
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (fetchDate = dateStr) => {
     setLoading(true);
     setIsWakingUp(false);
     
@@ -42,7 +45,7 @@ const DayView = () => {
     }, 3000);
 
     try {
-      const { data } = await api.get(`/tasks?date=${dateStr}`);
+      const { data } = await api.get(`/tasks?date=${fetchDate}`);
       setTasks(data);
     } catch (err) {
       console.error('Failed to fetch tasks', err);
@@ -129,60 +132,76 @@ const DayView = () => {
     }
   };
 
-  const pendingDeleteRef = useRef(null);
+  const pendingRestoreRef = useRef(null);
+  const undoTimerRef = useRef(null);
   const [toast, setToast] = useState(null);
 
-  const commitDelete = (taskId) => {
-    if (!taskId) return;
-    api.delete(`/tasks/${taskId}`).catch(console.error);
-    if (pendingDeleteRef.current?._id === taskId) {
-      pendingDeleteRef.current = null;
-      setToast(null);
-    }
-  };
-
-  const handleTaskDelete = (id) => {
+  const handleTaskDelete = async (id) => {
     const taskToDelete = tasks.find(t => t._id === id);
     if (!taskToDelete) return;
 
     // Optimistically remove from UI
     setTasks(prev => prev.filter(t => t._id !== id));
 
-    // Commit previous delete if one exists
-    if (pendingDeleteRef.current) {
-      commitDelete(pendingDeleteRef.current._id);
-    }
-
-    pendingDeleteRef.current = taskToDelete;
+    // Store for potential undo
+    pendingRestoreRef.current = taskToDelete;
     setToast(taskToDelete);
 
-    // Auto commit after 5s
-    setTimeout(() => {
-      if (pendingDeleteRef.current?._id === id) {
-        commitDelete(id);
-      }
+    // Immediately execute backend delete
+    try {
+      await api.delete(`/tasks/${id}`);
+    } catch (err) {
+      console.error('Delete failed', err);
+    }
+
+    // Auto dismiss toast after 5s
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = setTimeout(() => {
+      setToast(null);
+      pendingRestoreRef.current = null;
     }, 5000);
   };
 
-  const handleUndo = () => {
-    if (pendingDeleteRef.current) {
-      const restored = pendingDeleteRef.current;
-      setTasks(prev => {
-        const newTasks = [...prev, restored];
-        return newTasks.sort((a, b) => {
-          if (a.createdAt && b.createdAt) return a.createdAt > b.createdAt ? 1 : -1;
-          return 0;
-        });
+  const handleUndo = async () => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    const restored = pendingRestoreRef.current;
+    if (!restored) return;
+    
+    setToast(null);
+    pendingRestoreRef.current = null;
+    
+    // Put back optimistically (using old ID temporarily)
+    setTasks(prev => {
+      const newTasks = [...prev, restored];
+      return newTasks.sort((a, b) => {
+        if (a.createdAt && b.createdAt) return a.createdAt > b.createdAt ? 1 : -1;
+        return 0;
       });
-      pendingDeleteRef.current = null;
-      setToast(null);
+    });
+
+    try {
+      // Re-create the full task via our new restore route (omitting old ID to let Mongo generate a new one, or keeping it depending on schema - mongoose handles the rest)
+      const { _id, ...taskData } = restored;
+      const { data: newRestoredTask } = await api.post('/tasks/restore', taskData);
+      
+      // Update with the actual restored task to sync the new ID
+      setTasks(current => current.map(t => t._id === restored._id ? newRestoredTask : t).sort((a, b) => {
+        if (a.createdAt && b.createdAt) return a.createdAt > b.createdAt ? 1 : -1;
+        return 0;
+      }));
+    } catch (err) {
+      console.error('Restore failed', err);
+      // Rollback optimism
+      setTasks(prev => prev.filter(t => t._id !== restored._id));
+      alert('Failed to restore task.');
     }
   };
 
   useEffect(() => {
     return () => {
-      if (pendingDeleteRef.current) {
-        api.delete(`/tasks/${pendingDeleteRef.current._id}`).catch(() => {});
+      if (pendingRestoreRef.current) {
+        // Soft delete wasn't fully restored, actually it's already deleted in the backend immediately.
+        // We do nothing on unmount now since the backend was already updated.
       }
     };
   }, []);
@@ -191,11 +210,59 @@ const DayView = () => {
   const totalCount = tasks.length;
   const progressPct = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
+  const filteredTasks = tasks.filter(t => {
+    if (filter === 'high') return t.priority === 'high';
+    if (filter === 'rolled') return t.rolloverCount > 0;
+    return true;
+  });
+
+  useEffect(() => {
+    const handleTaskCreated = () => {
+      if (dateStr === dayjs().format('YYYY-MM-DD')) {
+        fetchTasks(dateStr);
+      }
+    };
+    window.addEventListener('taskCreated', handleTaskCreated);
+    return () => window.removeEventListener('taskCreated', handleTaskCreated);
+  }, [dateStr]);
+
+  // Keyboard navigation shortcuts
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      // Ignore if user is typing in an input/textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+      if (e.key === 'j') {
+        setActiveIndex(prev => Math.min(prev + 1, filteredTasks.length - 1));
+      } else if (e.key === 'k') {
+        setActiveIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'd') {
+        if (activeIndex >= 0 && activeIndex < filteredTasks.length) {
+          const task = filteredTasks[activeIndex];
+          try {
+            const res = await api.patch(`/tasks/${task._id}`, { completed: !task.completed });
+            handleTaskUpdate(res.data);
+          } catch (err) {
+            console.error('Failed to toggle completion via shortcut', err);
+          }
+        }
+      } else if (e.key === 'e') {
+        if (activeIndex >= 0 && activeIndex < filteredTasks.length) {
+          const task = filteredTasks[activeIndex];
+          window.dispatchEvent(new CustomEvent('editTask', { detail: task._id }));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeIndex, filteredTasks]);
+
 
 
   return (
-    <div className="flex-1 flex flex-col w-full max-w-[900px] mx-auto pb-24 items-start">
-      <div className="flex flex-col w-full min-w-0 pb-24">
+    <div className="flex-1 flex flex-col w-full max-w-[900px] mx-auto pb-24 items-start xl:flex-row xl:gap-12">
+      <div className="flex flex-col w-full min-w-0 xl:flex-1 pb-24">
       {/* Hero Header */}
       <div className="mb-10 mt-6">
         <div className="text-[12px] font-bold text-[var(--text-dim)] uppercase tracking-wider mb-2">
@@ -204,6 +271,19 @@ const DayView = () => {
         <h2 className="text-[32px] font-[700] tracking-tight leading-none text-[var(--text)] mb-6">
           {selectedDate.format('D MMMM')}
         </h2>
+        
+        {/* Quick Filters */}
+        <div className="flex items-center gap-2 mb-6 mt-4">
+          <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-colors ${filter === 'all' ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--field)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+            All
+          </button>
+          <button onClick={() => setFilter('high')} className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-colors ${filter === 'high' ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--field)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+            High Priority
+          </button>
+          <button onClick={() => setFilter('rolled')} className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-colors ${filter === 'rolled' ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--field)] text-[var(--text-dim)] hover:text-[var(--text)]'}`}>
+            Rolled
+          </button>
+        </div>
         
         {/* Progress Card */}
         <div className="inline-flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-[14px] px-5 py-3.5 shadow-sm">
@@ -242,66 +322,83 @@ const DayView = () => {
           <div className="flex flex-col">
             
             <div className="w-full border-t border-[var(--border)]">
-              {tasks.length === 0 ? (
-                <div className="text-[var(--text-dim)] font-medium py-16 text-[13px]">No tasks scheduled for this day.</div>
+              {loading && !isWakingUp ? (
+                <div className="text-[13px] font-medium text-[var(--text-dim)] text-center py-8">Loading...</div>
+              ) : filteredTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-[14px] font-bold text-[var(--text-dim)] mb-1">
+                    {filter === 'all' ? 'No tasks yet' : `No ${filter} tasks`}
+                  </div>
+                  <div className="text-[12px] text-[var(--text-faint)]">
+                    {filter === 'all' ? 'What needs to be done?' : 'Try changing your filter.'}
+                  </div>
+                </div>
               ) : (
-                tasks.map(task => (
+                <div className="flex flex-col divide-y divide-[var(--border)] border-t border-[var(--border)]">
+                {filteredTasks.map((task, index) => (
                   <TaskRow 
                     key={task._id} 
                     task={task} 
+                    isActive={activeIndex === index}
                     onUpdate={handleTaskUpdate}
                     onDelete={handleTaskDelete}
                   />
-                ))
+                ))}
+              </div>
               )}
             </div>
             
             {/* Quick Add Form */}
             <form onSubmit={handleCreateTask} className="mt-0 border-t border-[var(--border)] pt-4 pb-4">
-              <div className="flex items-center space-x-3 w-full bg-[var(--field)] p-1.5 pl-3 rounded-xl border border-[var(--border)] focus-within:border-[var(--border-strong)] transition-colors">
-                <select 
-                  value={newTaskPriority}
-                  onChange={(e) => setNewTaskPriority(e.target.value)}
-                  className="bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none cursor-pointer"
-                >
-                  <option value="high">High</option>
-                  <option value="normal">Normal</option>
-                  <option value="low">Low</option>
-                </select>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full bg-[var(--field)] p-2 sm:p-1.5 sm:pl-3 rounded-xl border border-[var(--border)] focus-within:border-[var(--border-strong)] transition-colors">
                 
                 <input 
                   type="text"
                   placeholder="What needs to be done?"
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="flex-1 bg-transparent font-medium text-[var(--text)] text-[14px] outline-none placeholder:text-[var(--text-faint)]"
+                  className="w-full sm:flex-1 bg-transparent font-medium text-[var(--text)] text-[14px] outline-none placeholder:text-[var(--text-faint)] px-2 sm:px-0 py-1 sm:py-0"
                 />
                 
-                <input 
-                  type="number"
-                  placeholder="mins"
-                  value={newTaskMinutes}
-                  onChange={(e) => setNewTaskMinutes(e.target.value)}
-                  className="w-16 bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none text-right placeholder:text-[var(--text-faint)] tabular-nums"
-                  min="0"
-                  step="5"
-                />
+                <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 border-[var(--border)] pt-2 sm:pt-0">
+                  <select 
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value)}
+                    className="bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none cursor-pointer"
+                  >
+                    <option value="high">High</option>
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                  </select>
+                  
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number"
+                      placeholder="mins"
+                      value={newTaskMinutes}
+                      onChange={(e) => setNewTaskMinutes(e.target.value)}
+                      className="w-16 bg-transparent font-medium text-[13px] text-[var(--text-dim)] outline-none text-right placeholder:text-[var(--text-faint)] tabular-nums"
+                      min="0"
+                      step="5"
+                    />
 
-                <button 
-                  type="button"
-                  onClick={() => setIsRecurring(!isRecurring)}
-                  className={`p-1.5 rounded transition-colors ${isRecurring ? 'text-[var(--accent)] bg-[var(--surface)] shadow-sm' : 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}
-                  title="Repeat daily"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-                </button>
-                
-                <button 
-                  type="submit"
-                  className="bg-[var(--text)] text-[var(--bg)] text-[13px] font-bold px-4 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  Add
-                </button>
+                    <button 
+                      type="button"
+                      onClick={() => setIsRecurring(!isRecurring)}
+                      className={`p-1.5 rounded transition-colors ${isRecurring ? 'text-[var(--accent)] bg-[var(--surface)] shadow-sm' : 'text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--surface)]'}`}
+                      title="Repeat daily"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                    </button>
+                    
+                    <button 
+                      type="submit"
+                      className="bg-[var(--text)] text-[var(--bg)] text-[13px] font-bold px-4 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Recurring Options Expansion */}
@@ -323,6 +420,8 @@ const DayView = () => {
         )}
       </div>
       
+      <UpcomingPanel activeDateStr={dateStr} />
+
       {/* Date navigation */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center z-50 pointer-events-none">
         

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
 import api from '../api/api';
 
-const TaskRow = ({ task, onUpdate, onDelete }) => {
+const TaskRow = ({ task, onUpdate, onDelete, isActive = false }) => {
   const [expanded, setExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
@@ -10,6 +10,18 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
   const [editPriority, setEditPriority] = useState(task.priority);
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [customRescheduleDate, setCustomRescheduleDate] = useState('');
+  const editInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleEditEvent = (e) => {
+      if (e.detail === task._id) {
+        setIsEditing(true);
+        setTimeout(() => editInputRef.current?.focus(), 10);
+      }
+    };
+    window.addEventListener('editTask', handleEditEvent);
+    return () => window.removeEventListener('editTask', handleEditEvent);
+  }, [task._id]);
 
   const toggleComplete = async () => {
     const prevCompleted = task.completed;
@@ -81,7 +93,7 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
 
   if (isEditing) {
     return (
-      <div className="border-b border-[var(--border)] last:border-b-0 py-3.5 px-3 bg-[var(--field)] transition-colors">
+      <div className={`border-b border-[var(--border)] last:border-b-0 py-3.5 px-3 bg-[var(--field)] transition-colors ${isActive ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg)]' : ''}`}>
         <div className="flex items-center space-x-3 w-full">
           <select 
             value={editPriority}
@@ -94,6 +106,7 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
           </select>
           
           <input 
+            ref={editInputRef}
             type="text"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
@@ -156,7 +169,7 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
   }
 
   return (
-    <div className="group border-b border-[var(--border)] last:border-b-0 py-3.5 px-3 transition-colors">
+    <div className={`group border-b border-[var(--border)] last:border-b-0 py-3.5 px-3 transition-colors ${isActive ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg)] bg-[var(--surface-3)] rounded-lg' : ''}`}>
       <div className="flex items-center w-full">
         <button 
           onClick={toggleComplete}
@@ -170,7 +183,7 @@ const TaskRow = ({ task, onUpdate, onDelete }) => {
         </button>
 
         <div className="flex-1 min-w-0 flex items-center flex-wrap gap-2">
-          <h3 className={`text-[14px] font-medium truncate transition-all ${task.completed === true ? 'line-through opacity-50 text-[var(--text-faint)]' : 'text-[var(--text)]'}`}>
+          <h3 className={`text-[14px] font-medium truncate transition-all ${task.completed ? 'line-through opacity-50 text-[var(--text-faint)]' : 'text-[var(--text)]'}`}>
             {task.title}
           </h3>
           
