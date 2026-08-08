@@ -17,6 +17,11 @@ dotenv.config();
 const app = express();
 app.set('trust proxy', 1);
 
+// Health Check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'daybook-backend' });
+});
+
 // Middleware
 app.use(helmet());
 app.use(cors({
